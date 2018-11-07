@@ -1,0 +1,245 @@
+Kernel - https://www.tldp.org/LDP/lkmpg/2.6/lkmpg.pdf
+The GNU Hurd and QNX Neutrino are two examples of a microkernel.
+
+All modules at /proc/modules 
+--> lsmode command to see what modules are currently loaded 
+
+When the kernel needs a feature that is not resident in the kernel, the kernel module daemon kmod[1] execs m
+odprobe to load the module in.A module compiled for one kernel won't load if you boot a different kernel unless 
+you enable CONFIG_MODVERSIONS in the kernel.  Kernel modules must have at least two functions: a "start" (initialization) function called init_module() which is called when the module is insmoded into the kernel, and an "end" (cleanup) function called cleanup_module() which is called just before it is rmmoded.  If both syslogd and klogd are running, then the message will also get appended to /var/log/messages
+
+—— —— ——To check kernel version use 
+> uname -r 
+
+—— —— —— Steps to write and execute simple kernel program ———— 
+
+#include <linux/module.h>        
+#include <linux/kernel.h>      
+static int __init hello_2_init(void)
+{
+        printk(KERN_INFO "Welcome to real stuff 2\n");
+        return 0;
+}
+static void __exit hello_2_exit(void)
+{
+        printk(KERN_INFO "Coffee break 2\n");
+}
+module_init(hello_2_init);
+module_exit(hello_2_exit);
+
+——— now create a Makefile ——— 
+obj−m += <program name>.o      //if you have 2 programs then add one more line of same nature
+all:
+  make −C /lib/modules/$(shell uname −r)/build M=$(PWD) modules   //make sure to put tab space at the front of the line
+clean:
+  make −C /lib/modules/$(shell uname −r)/build M=$(PWD) clean        //make sure to put tab space at the front of the line
+
+—— now compile program using make command which will create <program name>.ko file ———— 
+> make 
+
+— - now insert above module into kernel ——————— 
+> insmod ./<program name>.ko 
+
+—— Now check /proc/modules and once done, remove module ——— 
+> rmmod <program name> 
+
+—— To list all modules , use /sbin/lsmod command and to load module into kernel by taking care of dependencies , use /sbin/modprobe <name of the module> and to remove use /sbin/rmnod <name of the module > . To get info about module use, /sbin/modinfo <module name>
+
+—————————— You can see all messages by running DMESG or /var/log/messages ———————————————— 
+
+—————————— Enhancement 1 - LICENSING AND DOCUMENTATION MODULES ——— 
+#include <linux/module.h>
+#include <linux/kernel.h>
+#include <linux/init.h>
+#define DRIVER_AUTHOR "First last name"
+#define DRIVER_DESC   "A sample driver"
+
+  static int __init init_hello_4(void{ 
+    printk(KERN_INFO "Hello, world 4\n");
+    return 0;
+  }
+  static void __exit cleanup_hello_4(void){
+    printk(KERN_INFO "Goodbye, world 4\n");
+  }
+module_init(init_hello_4);
+module_exit(cleanup_hello_4);
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR(DRIVER_AUTHOR);
+MODULE_DESCRIPTION(DRIVER_DESC);        
+MODULE_SUPPORTED_DEVICE("testdevice");
+
+—————————— Enhancement 2 - PASSING COMMAND LINE ARGUMENT TO MODULE ——— 
+
+This is under /linux/moduleparam.h library . Run command insmod <program name>.ko <argument> 
+
+Macros used - 
+module_param()  — example module_param(variable name , data type , permission of file ) 
+module_param_array() - int myarry[2] ; module_param_array(variable name, data type, pointer to the variable,permission bits)
+module_param_string() - int myarray[4]; int count ; module_parm_array(variable name, data type, pointer to the variable , permission bits) //put count into “count” variable
+module_parm_desc() — module_parm_desc(variable name, string desctiption of variable) 
+
+#include <linux/kernel.h>
+#include <linux/init.h>
+#include <linux/moduleparam.h>
+#include <linux/module.h>
+#include <linux/stat.h>
+#include <linux/module.h> 
+
+MODULE_AUTHOR("Alan");
+MODULE_LICENSE("GPL");
+
+static char *myname ;
+module_param(myname, charp, 0000) ;
+MODULE_PARM_DESC(myname, "Name of the candidate");
+
+static int id;
+module_param(id, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP );
+MODULE_PARM_DESC(id, "Id of the candidate");
+
+static int __init myprogram_init(void) { 
+  printk(KERN_INFO "Initializing of the module ");
+  printk(KERN_INFO "Name of the candidate %s\n" , myname);
+  printk(KERN_INFO "Id of the candidate %d\n" , id);
+  return 0;
+}
+
+static void __exit myprogram_exit(void) { 
+  printk(KERN_INFO "Exiting the module . Thx");
+}
+
+module_init(myprogram_init);
+module_exit(myprogram_exit) ;
+
+———— dmesg output — 
+> insmod my program.ko myname=Rick id=22
+>dmesg
+[2220245.771289] Initializing of the module 
+[2220245.771299] Name of the candidate Rick
+[2220245.771303] Id of the candidate 22
+
+—————————— Enhancement  3 - MODULE SPANNING MULTIPLE FILES ——— 
+
+#include <linux/kernel.h>
+#include <linux/module.h>
+
+static int __init start_init(void) { 
+
+  return 0;
+}
+module_init(start_init);
+————————— second program ———— 
+
+#include <linux/kernel.h>
+#include <linux/module.h>
+
+static void __exit stop_exit(void) { 
+
+
+}
+module_exit(stop_exit);
+
+——————————— Makefile ———— 
+
+obj-m += start_init.o
+obj-m += stop_exit.o
+startstop-objs := start.o stop.o
+
+all:
+	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules
+clean:
+	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) clean
+
+—————————— Enhancement  3 - BUILDING MODULES FOR A PRECOMPILED KERNEL ——— 
+
+Use MODULE_FORCE_UPLOAD and
+rmmod −f module command.   In certain circumstances you could require to compile and insert a module into a running kernel which you are not allowed to recompile, or on a machine that you prefer not to reboot. 
+
+—check what version you have used to compile your module . Also  keep a backup copy of the makefile used to compile your kernel available in /lib/modules/2.6.5−1.358/build
+> modinfo  <name of your module.ko>
+
+— check what is current kernel version which is at file /boot/config <number> . You can get this number from command uname -r  
+— now copy this config file into your kernel source tree as follows 
+> cp /boot/config-`uname -r`  /usr/src/linux-`uname -r`/.config
+
+— even with two configuration files which are exactly the same, a slight difference in the version magic could be possible, and it is sufficient to prevent insertion of the module into the kernel. That slight difference, namely the custom string which appears in the module's version magic and not in the kernel's one, is due to a modification with respect to the original, in the makefile that some distribution include. Then, examine your /usr/src/linux/Makefile, and make sure that the specified version information matches exactly the one used for your current kernel. In this case, you need to restore the value of symbol EXTRAVERSION to whatever value you get from uname -r 
+
+— Additionally, if you already started a kernel build with the previous (wrong) Makefile, you should also rerun make, or directly modify symbol UTS_RELEASE in file /usr/src/linux−2.6.x/include/linux/version.h according to contents of file /lib/modules/2.6.x/build/include/linux/version.h, or overwrite the latter with the first.
+Now, please run make to update configuration and version headers and objects.
+
+——————————  ——————PRELIMINARIES - NAMESPACE———  ——— 
+
+
+When writing kernel code, even the smallest module will be linked against the entire kernel, so this is definitely an issue. The best way to deal with this is to declare all your variables as static and to use a well−defined prefix for your symbols. By convention, all kernel prefixes are lowercase. If you don't want to declare everything as static, another option is to declare a symbol table and register it with a kernel. We'll get to this later. The file /proc/kallsyms holds all the symbols that the kernel knows about and which are therefore accessible to your modules since they share the kernel's codespace.
+
+——————————  ——————PRELIMINARIES - CODESPACE———  ——— 
+
+If you haven't thought about what a segfault really means, you may be surprised to hear that pointers don't actually point to memory locations. Not real ones, anyway. When a process is created, the kernel sets aside a portion of real physical memory and hands it to the process to use for its executing code, variables, stack, heap and other things which a computer scientist would know about[5]. This memory begins with 0x00000000 and extends up to whatever it needs to be. Since the memory space for any two processes don't overlap, every process that can access a memory address, say 0xbffff978, would be accessing a different location in real physical memory! The processes would be accessing an index named 0xbffff978 which points to some kind of offset into the region of memory set aside for that particular process. The kernel has its own space of memory as well. Since a module is code which can be dynamically inserted and removed in the kernel (as opposed to a semi−autonomous object), it shares the kernel's codespace rather than having its own. Therefore, if your module segfaults, the kernel segfaults.
+
+
+——————————  ——————DEVICE DRIVERS———  ——— 
+
+One class of module is the device driver, which provides functionality for hardware like a TV card or a serial port. On unix, each piece of hardware is represented by a file located in /dev named a device file which provides the means to communicate with the hardware. The device driver provides the communication on behalf of a user program. So the es1370.o sound card device driver might connect the /dev/sound device file to the Ensoniq IS1370 sound card. 
+
+——————————  ——————MAJOR AND MINOR NUMBER ———  ——— 
+The major number tells you which driver is used to access the hardware. Each driver is assigned a unique major number; all device files with the same major number are controlled by the same driver. All the above major numbers are 3, because they're all controlled by the same driver. The minor number is used by the driver to distinguish between the various hardware it controls. Returning to the example above, although all three devices are handled by the same driver they have unique minor numbers because the driver sees them as being different pieces of hardware.
+
+Devices are divided into Characters and Block devices.
+
+mknod /dev/coffee c 12 2 			—> this command to create char device 
+
+————————————————FILE OPERATION ———————————— 
+Each device is represented in the kernel by a file structure, which is defined in linux/fs.h. An instance of struct file is commonly named filp
+Every character driver needs to define a function that reads from the device. The file_operations structure holds the address of the module's function that performs that operation. 
+Adding a driver to your system means registering it with the kernel. This is synonymous with assigning it a major number during the module's initialization. You do this by using the register_chrdev function, defined by linux/fs.h.
+
+struct file_operations {
+        struct module *owner;
+
+ loff_t(*llseek) (struct file *, loff_t, int);
+ ssize_t(*read) (struct file *, char __user *, size_t, loff_t *);
+ ssize_t(*aio_read) (struct kiocb *, char __user *, size_t, loff_t);
+ ssize_t(*write) (struct file *, const char __user *, size_t, loff_t *);
+ ssize_t(*aio_write) (struct kiocb *, const char __user *, size_t,
+                      loff_t);
+int (*readdir) (struct file *, void *, filldir_t);
+unsigned int (*poll) (struct file *, struct poll_table_struct *);
+int (*ioctl) (struct inode *, struct file *, unsigned int,
+              unsigned long);
+int (*mmap) (struct file *, struct vm_area_struct *);
+int (*open) (struct inode *, struct file *);
+int (*flush) (struct file *);
+int (*release) (struct inode *, struct file *);
+int (*fsync) (struct file *, struct dentry *, int datasync);
+int (*aio_fsync) (struct kiocb *, int datasync);
+int (*fasync) (int, struct file *, int);
+int (*lock) (struct file *, int, struct file_lock *);
+ ssize_t(*readv) (struct file *, const struct iovec *, unsigned long,
+                  loff_t *);
+ ssize_t(*writev) (struct file *, const struct iovec *, unsigned long,
+                   loff_t *);
+ ssize_t(*sendfile) (struct file *, loff_t *, size_t, read_actor_t,
+                     void __user *);
+ ssize_t(*sendpage) (struct file *, struct page *, int, size_t,
+                     loff_t *, int);
+unsigned long (*get_unmapped_area) (struct file *, unsigned long,
+                                    unsigned long, unsigned long,
+                                    unsigned long);
+};
+
+
+————————————————LIST OF SYSTEM CALLS  ———————————— 
+
+> ausyscall —dump   // this command will list all the system calls 
+
+
+
+
+
+
+
+
+
+
+
+
+
