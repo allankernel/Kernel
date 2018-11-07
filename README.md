@@ -12,5 +12,5 @@ Part 1 - 3 Programs as follows
 > dmesg
 > cat char_dev
 > rmmod chardev
-
+--------------------------------- 
 
